@@ -33,8 +33,13 @@ class ImageRecyclerAdapter(
 
         fun bind(url: URL) {
             downloadJob = scope.launch {
-                val cachedBitmap = getBitmap(url.path.substring(url.path.lastIndexOf('/') + 1), url)
-                updateImageView(cachedBitmap)
+                // appeler chrono
+                val elapsedTime = kotlin.system.measureTimeMillis {
+                    val cachedBitmap =
+                        getBitmap(url.path.substring(url.path.lastIndexOf('/') + 1), url)
+                    updateImageView(cachedBitmap)
+                }
+                println("Le temps d'exécution était de $elapsedTime millisecondes.")
             }
         }
 
