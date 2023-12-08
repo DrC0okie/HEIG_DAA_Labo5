@@ -18,13 +18,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
-    private lateinit var clearCachePeriodicRequest: WorkRequest
+    private lateinit var clearCacheRequest: WorkRequest
 
     private lateinit var adapter: ImageRecyclerAdapter
 
     companion object {
         const val CLEAR_CACHE_INTERVAL = 15L
         const val PICTURES_NB = 10000
+        const val ENDPONT = "https://daa.iict.ch/images/"
+        const val FILE_EXT = ".jpg"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,25 +38,20 @@ class MainActivity : AppCompatActivity() {
         Cache.setDir(cacheDir)
 
         // Generate list of URLs
-        val items = List(PICTURES_NB) {
-            val num = it + 1
-            URL("https://daa.iict.ch/images/$num.jpg")
-        }
+        val items = List(PICTURES_NB) { URL("$ENDPONT${it + 1}$FILE_EXT") }
 
         adapter = ImageRecyclerAdapter(items, lifecycleScope)
         binding.recyclerView.adapter = adapter
         binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
 
         // Bind the periodic cache clear
-        clearCachePeriodicRequest =
+        clearCacheRequest =
             PeriodicWorkRequestBuilder<ClearCacheWorker>(
                 CLEAR_CACHE_INTERVAL,
                 TimeUnit.MINUTES
             ).build()
 
-        WorkManager
-            .getInstance(applicationContext)
-            .enqueue(clearCachePeriodicRequest)
+        WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -68,6 +65,7 @@ class MainActivity : AppCompatActivity() {
                 launchClearCache()
                 true
             }
+
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -79,9 +77,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun launchClearCache() {
         val clearCacheRequest = OneTimeWorkRequest.Builder(ClearCacheWorker::class.java).build()
-        WorkManager
-            .getInstance(applicationContext)
-            .enqueue(clearCacheRequest)
+        WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
         adapter.notifyDataSetChanged()
     }
 }
