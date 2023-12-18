@@ -4,6 +4,8 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Button
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.work.*
 import java.util.concurrent.TimeUnit
@@ -49,6 +51,14 @@ class MainActivity : AppCompatActivity() {
             ).build()
 
         WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
+
+        // Test button click listener
+        val testButton = findViewById<Button>(R.id.startTestButton)
+        testButton.setOnClickListener {
+            val nbItems = 32
+            val results = PerformanceTester(items.take(nbItems), lifecycleScope).testDownloadPerformance()
+            showResultsDialog(results, nbItems)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -67,14 +77,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        lifecycleScope.coroutineContext.cancelChildren()
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            // This ensures that coroutines are cancelled only when the activity is truly finishing
+            lifecycleScope.coroutineContext.cancelChildren()
+        }
     }
 
     private fun launchClearCache() {
         val clearCacheRequest = OneTimeWorkRequest.Builder(ClearCacheWorker::class.java).build()
         WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
         adapter.notifyDataSetChanged()
+    }
+
+    private fun showResultsDialog(results: String, nbItem: Int) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Test Results for $nbItem parallel downloads")
+        builder.setMessage(results)
+        builder.setPositiveButton("OK", null)
+        val dialog = builder.create()
+        dialog.show()
     }
 }
