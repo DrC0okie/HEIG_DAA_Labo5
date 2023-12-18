@@ -15,11 +15,8 @@ import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
-
     private lateinit var binding: ActivityMainBinding
-
     private lateinit var clearCacheRequest: WorkRequest
-
     private lateinit var adapter: ImageRecyclerAdapter
 
     companion object {

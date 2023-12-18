@@ -7,7 +7,7 @@ import java.nio.file.Files
 
 object Cache {
     private lateinit var cacheDir: File
-    private var expirationDelay = 60 * 5000L // Files expire after 5 minutes
+    private const val EXP_DELAY = 60 * 5000L
 
     fun setDir(cacheDir: File) {
         Cache.cacheDir = cacheDir
@@ -22,34 +22,21 @@ object Cache {
         return null
     }
 
-    fun set(name: String, image: Bitmap) {
-        val file = File(cacheDir, name)
-        file.writeBitmap(image)
-    }
+    fun set(name: String, image: Bitmap) = File(cacheDir, name).writeBitmap(image)
 
-    fun clear() {
-        cacheDir.deleteRecursively()
-        createCacheDir()
-    }
+    fun clear() = cacheDir.deleteRecursively().also { createCacheDir() }
 
     private fun createCacheDir() {
-        if (!cacheDir.exists()) {
+        if (!cacheDir.exists())
             Files.createDirectory(cacheDir.toPath())
-        }
     }
 
-    private fun isExpired(file: File): Boolean {
-        return file.lastModified() < System.currentTimeMillis() - expirationDelay
-    }
+    private fun isExpired(file: File) = file.lastModified() < System.currentTimeMillis() - EXP_DELAY
 
-    private fun File.writeBitmap(
-        bitmap: Bitmap,
-        format: Bitmap.CompressFormat = Bitmap.CompressFormat.JPEG,
-        quality: Int = 100
-    ) {
-        outputStream().use { out ->
-            bitmap.compress(format, quality, out)
-            out.flush()
+    private fun File.writeBitmap(bitmap: Bitmap, quality: Int = 100) {
+        outputStream().use {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it)
+            it.flush()
         }
     }
 }

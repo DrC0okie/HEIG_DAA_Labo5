@@ -12,12 +12,12 @@ import java.util.concurrent.Executors
 class ImageDownloader {
 
     // essaie d'un custom threads dispatcher pour améliorer les performances
-    val myThreadDispatcher = Executors.newFixedThreadPool(2).asCoroutineDispatcher()
+    private val threadDispatcher = Executors.newFixedThreadPool(2).asCoroutineDispatcher()
     companion object {
         private val TAG = ImageDownloader::class.qualifiedName
     }
 
-    suspend fun downloadImage(url: URL): ByteArray? = withContext(myThreadDispatcher) {
+    suspend fun downloadImage(url: URL): ByteArray? = withContext(threadDispatcher) {
         try {
             url.readBytes()
         } catch (e: Exception) {

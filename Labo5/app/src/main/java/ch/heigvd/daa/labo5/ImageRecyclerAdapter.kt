@@ -11,16 +11,13 @@ import kotlinx.coroutines.*
 import androidx.lifecycle.LifecycleCoroutineScope
 import java.net.URL
 
-class ImageRecyclerAdapter(
-    _items: List<URL> = listOf(),
-    private val scope: LifecycleCoroutineScope
-) :
+class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: LifecycleCoroutineScope) :
     RecyclerView.Adapter<ImageRecyclerAdapter.ViewHolder>() {
 
     private var items = listOf<URL>()
 
     init {
-        items = _items
+        items = urls
     }
 
     override fun getItemCount() = items.size
@@ -63,7 +60,7 @@ class ImageRecyclerAdapter(
                 cachedBitmap = downloader.decodeImage(bytes!!)
                 Cache.set(filename, cachedBitmap!!)
             }
-            return  cachedBitmap
+            return cachedBitmap
         }
     }
 
