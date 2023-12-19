@@ -1,7 +1,9 @@
 package ch.heigvd.daa.labo5
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
+import androidx.appcompat.app.AlertDialog
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,9 +14,9 @@ import kotlinx.coroutines.runBlocking
 import java.net.URL
 import java.util.concurrent.Executors
 
-class PerformanceTester(private val items: List<URL>, private val scope: CoroutineScope) {
+object PerformanceTester {
 
-    fun testDownloadPerformance(): String {
+    fun testDownloadPerformance(items: List<URL>, scope: CoroutineScope): String {
         val results = StringBuilder()
         val dispatcherPairs = listOf(
             "IO" to Dispatchers.IO,
@@ -26,14 +28,23 @@ class PerformanceTester(private val items: List<URL>, private val scope: Corouti
 
         runBlocking {
             dispatcherPairs.forEach { (name, dispatcher) ->
-                val result = testDownloadWithDispatcher(name, dispatcher)
+                val result = testDownloadWithDispatcher(items, name, dispatcher, scope)
                 results.append("$result\n")
             }
         }
         return results.toString()
     }
 
-    private suspend fun testDownloadWithDispatcher(dispatcherName: String, dispatcher: CoroutineDispatcher): String {
+    fun showResultsDialog(results: String, nbItem: Int, context: Context) {
+        val builder = AlertDialog.Builder(context)
+        builder.setTitle("Test Results for $nbItem parallel downloads")
+        builder.setMessage(results)
+        builder.setPositiveButton("OK", null)
+        val dialog = builder.create()
+        dialog.show()
+    }
+
+    private suspend fun testDownloadWithDispatcher(items: List<URL>, dispatcherName: String, dispatcher: CoroutineDispatcher, scope: CoroutineScope): String {
         val startTime = System.currentTimeMillis()
         scope.launch(dispatcher) {
             items.map { url ->

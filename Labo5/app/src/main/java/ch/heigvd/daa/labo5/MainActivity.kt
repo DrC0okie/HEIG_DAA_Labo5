@@ -1,19 +1,19 @@
 package ch.heigvd.daa.labo5
 
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
-import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.work.*
-import java.util.concurrent.TimeUnit
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.work.WorkRequest
+import androidx.work.*
 import ch.heigvd.daa.labo5.databinding.ActivityMainBinding
 import kotlinx.coroutines.cancelChildren
 import java.net.URL
+import java.util.concurrent.TimeUnit
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -55,9 +55,7 @@ class MainActivity : AppCompatActivity() {
         // Test button click listener
         val testButton = findViewById<Button>(R.id.startTestButton)
         testButton.setOnClickListener {
-            val nbItems = 32
-            val results = PerformanceTester(items.take(nbItems), lifecycleScope).testDownloadPerformance()
-            showResultsDialog(results, nbItems)
+            this.startActivity(Intent(this, TestActivity::class.java))
         }
     }
 
@@ -89,14 +87,5 @@ class MainActivity : AppCompatActivity() {
         val clearCacheRequest = OneTimeWorkRequest.Builder(ClearCacheWorker::class.java).build()
         WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
         adapter.notifyDataSetChanged()
-    }
-
-    private fun showResultsDialog(results: String, nbItem: Int) {
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Test Results for $nbItem parallel downloads")
-        builder.setMessage(results)
-        builder.setPositiveButton("OK", null)
-        val dialog = builder.create()
-        dialog.show()
     }
 }
