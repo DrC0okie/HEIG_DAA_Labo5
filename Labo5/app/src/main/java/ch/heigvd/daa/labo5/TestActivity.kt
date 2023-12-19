@@ -23,23 +23,20 @@ class TestActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         with(binding) {
-            editTextNbImages.setText(PICTURES_NB)
+            editTextNbImages.setText(PICTURES_NB.toString())
             buttonBack.setOnClickListener {
                 finish()
             }
             buttonStartTest.setOnClickListener {
                 val nbDownloads = editTextNbImages.text.toString().toInt()
-                if (nbDownloads < 0 || nbDownloads > 32)
+                if (nbDownloads < 0 || nbDownloads > 32){
                     editTextNbImages.error = "The quantity of images must be > 0 and < 32"
-                else
+                } else{
                     editTextNbImages.error = null
-
-                val items = List(nbDownloads) { URL("${ENDPOINT}${it + 1}${FILE_EXT}") }
-                val results = PerformanceTester.testDownloadPerformance(
-                    items.take(nbDownloads),
-                    lifecycleScope
-                )
-                PerformanceTester.showResultsDialog(results, nbDownloads, this@TestActivity)
+                    val items = List(nbDownloads) { URL("${ENDPOINT}${it + 1}${FILE_EXT}") }
+                    val results = PerformanceTester.testDownloadPerformance(items, lifecycleScope)
+                    PerformanceTester.showResultsDialog(results, nbDownloads, this@TestActivity)
+                }
             }
         }
     }
