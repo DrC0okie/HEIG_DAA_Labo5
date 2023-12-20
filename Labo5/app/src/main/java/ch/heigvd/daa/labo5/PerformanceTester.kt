@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -16,35 +17,42 @@ import java.util.concurrent.Executors
 
 object PerformanceTester {
 
-    fun testDownloadPerformance(items: List<URL>, scope: CoroutineScope): String {
-        val results = StringBuilder()
-        val dispatcherPairs = listOf(
-            "IO" to Dispatchers.IO,
-            "2 Threads" to Executors.newFixedThreadPool(2).asCoroutineDispatcher(),
-            "4 Threads" to Executors.newFixedThreadPool(4).asCoroutineDispatcher(),
-            "8 Threads" to Executors.newFixedThreadPool(8).asCoroutineDispatcher(),
-            "16 Threads" to Executors.newFixedThreadPool(16).asCoroutineDispatcher()
-        )
+    val dispatcherPairs = listOf(
+        "IO" to Dispatchers.IO,
+        "2 Threads" to Executors.newFixedThreadPool(2).asCoroutineDispatcher(),
+        "4 Threads" to Executors.newFixedThreadPool(4).asCoroutineDispatcher(),
+        "8 Threads" to Executors.newFixedThreadPool(8).asCoroutineDispatcher(),
+        "16 Threads" to Executors.newFixedThreadPool(16).asCoroutineDispatcher()
+    )
 
-        runBlocking {
-            dispatcherPairs.forEach { (name, dispatcher) ->
-                val result = testDownloadWithDispatcher(items, name, dispatcher, scope)
-                results.append("$result\n")
+    suspend fun testDownloadPerformance(
+        items: List<URL>,
+        testScope: CoroutineScope,
+        uiScope: CoroutineScope,
+        updateUI: (String) -> Unit,
+        updateProgress: (Int) -> Unit
+    ): List<TestResult> {
+        val results = mutableListOf<TestResult>()
+
+        testScope.async {
+            dispatcherPairs.forEachIndexed { index, (name, dispatcher) ->
+                uiScope.launch { updateUI("Testing $name dispatcher...") }.join()
+                val duration = testDownloadWithDispatcher(items, name, dispatcher, testScope)
+                results.add(TestResult(name, duration))
+                uiScope.launch { updateUI("Testing complete!") }.join()
+                uiScope.launch { updateProgress(index + 1) }.join() // Update progress
             }
-        }
-        return results.toString()
+        }.await()
+
+        return results
     }
 
-    fun showResultsDialog(results: String, nbItem: Int, context: Context) {
-        val builder = AlertDialog.Builder(context)
-        builder.setTitle("Test Results for $nbItem parallel downloads")
-        builder.setMessage(results)
-        builder.setPositiveButton("OK", null)
-        val dialog = builder.create()
-        dialog.show()
-    }
-
-    private suspend fun testDownloadWithDispatcher(items: List<URL>, dispatcherName: String, dispatcher: CoroutineDispatcher, scope: CoroutineScope): String {
+    private suspend fun testDownloadWithDispatcher(
+        items: List<URL>,
+        dispatcherName: String,
+        dispatcher: CoroutineDispatcher,
+        scope: CoroutineScope
+    ): Long {
         val startTime = System.currentTimeMillis()
         scope.launch(dispatcher) {
             items.map { url ->
@@ -53,15 +61,12 @@ object PerformanceTester {
                 }
             }.joinAll()
         }.join() // Ensure the coroutine completes
-        val endTime = System.currentTimeMillis()
-        val duration = endTime - startTime
-        return "$dispatcherName: $duration ms"
+        return System.currentTimeMillis() - startTime
     }
-
 
     private suspend fun downloadImage(url: URL): Bitmap? {
         return try {
-            val downloader = ImageDownloader() // Assuming this is a class with downloading logic
+            val downloader = ImageDownloader()
             val bytes = downloader.downloadImage(url) // Download the image
             downloader.decodeImage(bytes!!) // Decode and return the Bitmap
         } catch (e: Exception) {

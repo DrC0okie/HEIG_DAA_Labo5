@@ -5,5 +5,10 @@
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
-    <style name="Theme.Labo5" parent="Base.Theme.Labo5" />
+    <style name="Theme.Labo5" parent="Base.Theme.Labo5">
+        <item name="colorPrimary">@color/main_theme</item>
+        <item name="colorPrimaryVariant">@color/nav_header</item>
+        <item name="android:statusBarColor">?attr/colorPrimary</item>
+        <item name="colorOnPrimary">@color/black</item>
+    </style>
 </resources>
