@@ -1,10 +1,11 @@
 package ch.heigvd.daa.labo5
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -14,18 +15,19 @@ import kotlinx.coroutines.cancelChildren
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
-
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnItemClickListener {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var clearCacheRequest: WorkRequest
     private lateinit var adapter: ImageRecyclerAdapter
 
     companion object {
-        const val CLEAR_CACHE_INTERVAL = 15L
+        const val INTERVAL = 15L
         const val PICTURES_NB = 10000
-        const val ENDPONT = "https://daa.iict.ch/images/"
+        const val ENDPOINT = "https://daa.iict.ch/images/"
         const val FILE_EXT = ".jpg"
+        const val uniqueWorkName = "ClearCachePeriodicWorkLabo5"
+        val WM_POLICY = ExistingPeriodicWorkPolicy.KEEP
+        val UNIT = TimeUnit.MINUTES
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,26 +39,16 @@ class MainActivity : AppCompatActivity() {
         Cache.setDir(cacheDir)
 
         // Generate list of URLs
-        val items = List(PICTURES_NB) { URL("$ENDPONT${it + 1}$FILE_EXT") }
+        val items = List(PICTURES_NB) { URL("$ENDPOINT${it + 1}$FILE_EXT") }
 
-        adapter = ImageRecyclerAdapter(items, lifecycleScope)
+        adapter = ImageRecyclerAdapter(items, lifecycleScope, this)
         binding.recyclerView.adapter = adapter
         binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
 
         // Bind the periodic cache clear
-        clearCacheRequest =
-            PeriodicWorkRequestBuilder<ClearCacheWorker>(
-                CLEAR_CACHE_INTERVAL,
-                TimeUnit.MINUTES
-            ).build()
-
-        WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
-
-        // Test button click listener
-        val testButton = findViewById<Button>(R.id.startTestButton)
-        testButton.setOnClickListener {
-            this.startActivity(Intent(this, TestActivity::class.java))
-        }
+        val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
+        val wm = WorkManager.getInstance(this)
+        wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -67,7 +59,11 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.menu_actions_refresh -> {
-                launchClearCache()
+                manualClearCache()
+                true
+            }
+            R.id.menu_actions_test -> {
+                this.startActivity(Intent(this, TestActivity::class.java))
                 true
             }
 
@@ -83,9 +79,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun launchClearCache() {
-        val clearCacheRequest = OneTimeWorkRequest.Builder(ClearCacheWorker::class.java).build()
-        WorkManager.getInstance(applicationContext).enqueue(clearCacheRequest)
-        adapter.notifyDataSetChanged()
+    override fun onItemClick(position: Int, items: List<URL>) {
+        val imageUrl = items[position].toString()
+        val intent = Intent(this, FullScreenImageActivity::class.java)
+        intent.putExtra("IMAGE_URL", imageUrl)
+        startActivity(intent)
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    private fun manualClearCache() {
+        val clearCacheWork = OneTimeWorkRequestBuilder<ClearCacheWorker>().build()
+        WorkManager.getInstance(this).enqueue(clearCacheWork)
+        adapter.notifyDataSetChanged() // Refresh the gallery
+        Toast.makeText(this, "Cache cleared", Toast.LENGTH_LONG).show()
     }
 }

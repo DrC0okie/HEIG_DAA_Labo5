@@ -8,12 +8,7 @@ import androidx.work.WorkerParameters
 class ClearCacheWorker(appContext: Context, workerParams: WorkerParameters) :
     Worker(appContext, workerParams) {
 
-    companion object {
-        private val TAG = ClearCacheWorker::class.qualifiedName
-    }
-
     override fun doWork(): Result {
-        Log.d(TAG, "Cleared cache dir")
         Cache.clear()
         return Result.success()
     }

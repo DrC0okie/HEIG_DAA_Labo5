@@ -1,7 +1,6 @@
 package ch.heigvd.daa.labo5
 
 import android.graphics.Bitmap
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,7 +10,6 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import androidx.lifecycle.LifecycleCoroutineScope
 import java.net.URL
-import java.util.concurrent.Executors
 
 /**
  * Adapter for a RecyclerView to display images from URLs using coroutines.
@@ -19,10 +17,14 @@ import java.util.concurrent.Executors
  * @param urls List of image URLs to be displayed in the RecyclerView.
  * @param scope LifecycleCoroutineScope for managing coroutine lifecycle.
  */
-class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: LifecycleCoroutineScope) :
+class ImageRecyclerAdapter(
+    urls: List<URL> = listOf(),
+    private val scope: LifecycleCoroutineScope,
+    private val itemClickListener: OnItemClickListener
+) :
     RecyclerView.Adapter<ImageRecyclerAdapter.ViewHolder>() {
 
-    private var items = listOf<URL>()
+    private var items: List<URL>
 
     init {
         items = urls
@@ -35,11 +37,24 @@ class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: Lifecy
      * Manages the loading and display of images from URLs.
      */
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+
+        init {
+            view.setOnClickListener {
+                // Scale animation for visual feedback
+                view.animate().scaleX(0.9f).scaleY(0.9f).setDuration(200).withEndAction {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+                }
+                val position = adapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    itemClickListener.onItemClick(position, items)
+                }
+            }
+        }
+
         private val image = view.findViewById<ImageView>(R.id.image_view_item)
         private val progressBar = view.findViewById<ProgressBar>(R.id.progressbar_item)
         private var currentUrl: String? = null
         private var downloadJob: Job? = null
-
 
         /**
          * Binds a URL to this ViewHolder. If the URL is different from the current one,
@@ -91,8 +106,7 @@ class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: Lifecy
          * @param bitmap The downloaded bitmap to display.
          */
         private suspend fun updateImageView(bitmap: Bitmap) = withContext(Dispatchers.Main) {
-            image.setImageBitmap(bitmap)
-            image.visibility = View.VISIBLE
+            with(image) { setImageBitmap(bitmap); visibility = View.VISIBLE }
             progressBar.visibility = View.GONE
         }
 
