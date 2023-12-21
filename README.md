@@ -10,7 +10,7 @@ Ce laboratoire consiste à concevoir une application Android, se présentant sou
 
 
 
-![](C:\Users\timot\Documents\HEIG\DAA\HEIG_DAA_Labo5\figures\Introduction.png)
+![](figures/Introduction.png)
 
 
 
@@ -108,7 +108,7 @@ binding.swipeRefreshLayout.setOnRefreshListener {
 
 
 
-### Extra: Implémentation de tests de performance
+### Implémentation de tests de performance
 
 Nous avons profité de la rallonge du délai de rendu de ce laboratoire pour aller plus loin que la consigne en implémentant une activité dont la tâche est de tester la performance de différents dispatchers et d'afficher les résultats dans un graphe en barres.
 
@@ -179,7 +179,7 @@ private suspend fun downloadImage(url: URL): Bitmap? {
 
 
 
-##### Création des `Dispatchers`
+#### Création des `Dispatchers`
 
 Nous avons défini une liste de `CoroutineDispatcher` comprenant le dispatcher par défaut "IO" et plusieurs dispatchers personnalisés avec un nombre fixe de threads. Cette diversité permet d'évaluer l'impact du nombre de threads sur les performances de téléchargement.
 
@@ -195,7 +195,7 @@ val dispatcherPairs = listOf(
 
 
 
-##### Test des performances
+#### Test des performances
 
 La méthode`testDispatcherPerformance` prend en charge l'itération sur chaque dispatcher, exécutant les tâches de téléchargement simultanément pour un ensemble donné d'URLs et mesurant le temps nécessaire pour achever ces tâches. Les résultats sont ensuite retournés sous forme de liste, prêts à être affichés dans le graphique.
 
@@ -235,7 +235,7 @@ private suspend fun getDuration(items: List<URL>, disp: CD, scope: CS): Long {
 
 Chaque élément de la RecyclerView est géré par une classe ViewHolder, qui est responsable du lancement et de la gestion de la coroutine pour le téléchargement et l'affichage de l'image associée à cet élément. Voici comment la gestion des coroutines est implémentée :
 
-Dans la classe ViewHolder, une coroutine est démarrée dans la méthode `bind(url: URL)`. Cette coroutine gère le téléchargement et l'affichage de l'image. La coroutine est lancée dans un `LifecycleCoroutineScope` . Ce `CoroutineScope` est utilisé pour lier les coroutines au cycle de vie de l'activité ou du fragment hôte, ce qui garantit que les coroutines sont annulées lorsque le cycle de vie est détruit. Cela ajoute une couche supplémentaire de gestion des coroutines en lien avec le cycle de vie des composants Android.
+Dans la classe ViewHolder, une coroutine est démarrée dans la méthode `bind(url: URL)`. Cette coroutine gère le téléchargement et l'affichage de l'image. La coroutine est lancée dans un `LifecycleCoroutineScope` . Ce `CoroutineScope` est utilisé pour lier les coroutines au cycle de vie de l'activité ou du fragment hôte, ce qui garantit que les coroutines sont annulées lorsque le cycle de vie est détruit.
 
 Pour garantir que chaque élément a une coroutine distincte, une variable `currentUrl` est utilisée. Lorsqu'une nouvelle URL est liée à un `ViewHolder`, il vérifie si cette URL est différente de l'actuelle. Si elle est différente, cela indique que l'élément est sur le point d'afficher une nouvelle image, nécessitant l'annulation de toute coroutine en cours associée à l'image précédente:
 
@@ -265,9 +265,7 @@ Pour garantir que chaque élément a une coroutine distincte, une variable `curr
 
 
 
-Le `RecyclerView` recycle les vues lorsqu'elles défilent hors de la zone visible. Pour gérer ça, la méthode `onViewRecycled` de l'adaptateur est surchargée. Cette méthode est appelée automatiquement lorsqu'un élément sort de la zone visible et est prêt à être réutilisé, indiquant que la vue est sur le point d'être recyclée pour un autre élément de la liste. Dans cette méthode, la méthode `unbind()` du `ViewHolder` est appelée. Cette méthode est chargée d'annuler toute coroutine active associée au ViewHolder. L'annulation est obtenue en appelant `downloadJob?.cancel()`, qui annule en toute sécurité la coroutine si elle est actuellement active. Cela garantit que tout téléchargement ou traitement d’image en cours est arrêté, libérant ainsi des ressources.
-
-Finalement, dans la méthode `unbind()`, la visibilité de ProgressBar et d'ImageView est réinitialisée. Cela prépare le ViewHolder à la réutilisation avec un nouvel élément, garantissant ainsi un état cohérent. 
+Le `RecyclerView` recycle les vues lorsqu'elles défilent hors de la zone visible. Pour gérer ça, la méthode `onViewRecycled` de l'adaptateur est surchargée. Cette méthode est appelée automatiquement lorsqu'un élément sort de la zone visible, indiquant que la vue est sur le point d'être recyclée. Dans cette méthode, la méthode `unbind()` du `ViewHolder` est appelée. Cette méthode est chargée d'annuler toute coroutine active associée au ViewHolder. L'annulation est obtenue en appelant `downloadJob?.cancel()`, qui annule en toute sécurité la coroutine si elle est actuellement active. Cela garantit que tout téléchargement ou traitement d’image en cours est arrêté, libérant ainsi des ressources.
 
 ```Kotlin
     override fun onViewRecycled(holder: ViewHolder) {
@@ -275,18 +273,22 @@ Finalement, dans la méthode `unbind()`, la visibilité de ProgressBar et d'Imag
     }
 ```
 
+
+
+Finalement, dans la méthode `unbind()`, la visibilité de ProgressBar et d'ImageView est réinitialisée. Cela prépare le ViewHolder à la réutilisation avec un nouvel élément, garantissant ainsi un état cohérent. 
+
 ```kotlin
-        fun unbind() {
-            // Cancel any ongoing download job to prevent memory leaks and unnecessary work
-            downloadJob?.cancel()
+fun unbind() {
+	// Cancel any ongoing download job to prevent memory leaks and unnecessary work
+	downloadJob?.cancel()
 
-            // Reset the visibility of the ProgressBar and ImageView
-            progressBar.visibility = View.VISIBLE
-            image.visibility = View.INVISIBLE
+	// Reset the visibility of the ProgressBar and ImageView
+	progressBar.visibility = View.VISIBLE
+	image.visibility = View.INVISIBLE
 
-            // Clear the current URL since the view is being recycled
-            currentUrl = null
-        }
+	// Clear the current URL since the view is being recycled
+	currentUrl = null
+}
 ```
 
 
@@ -306,13 +308,13 @@ Dans notre `MainActivity`, nous utilisons `lifecycleScope` pour lancer des corou
 Bien que `lifecycleScope` gère automatiquement l'annulation des coroutines, nous avons renforcé ce comportement dans la méthode `onDestroy()` de notre activité :
 
 ```Kotlin
-    override fun onDestroy() {
-        super.onDestroy()
-        if (isFinishing) {
-            // This ensures that coroutines are cancelled only when the activity is truly finishing
-            lifecycleScope.coroutineContext.cancelChildren()
-        }
-    }
+override fun onDestroy() {
+	super.onDestroy()
+	if (isFinishing) {
+		// This ensures coroutines are cancelled only when the activity is truly finishing
+		lifecycleScope.coroutineContext.cancelChildren()
+	}
+}
 ```
 
 
@@ -335,7 +337,7 @@ Comme mentionné dans la partie [Implémentation de tests de performance](#Extra
 
 
 
-![](C:\Users\timot\Documents\HEIG\DAA\HEIG_DAA_Labo5\figures\tests\4_tests.png)
+![](figures/tests/4_tests.png)
 
 
 
