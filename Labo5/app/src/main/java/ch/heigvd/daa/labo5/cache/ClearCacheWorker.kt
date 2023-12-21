@@ -3,7 +3,6 @@ package ch.heigvd.daa.labo5.cache
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import ch.heigvd.daa.labo5.cache.Cache
 
 /**
  * A worker class that handles clearing of the cache directory when scheduled.
