@@ -61,4 +61,7 @@ dependencies {
     //Glide
     implementation("com.github.bumptech.glide:glide:4.16.0")
     annotationProcessor("com.github.bumptech.glide:compiler:4.12.0")
+
+    // Swipe to refresh
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 }

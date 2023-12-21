@@ -1,4 +1,4 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.adapter
 
 import java.net.URL
 

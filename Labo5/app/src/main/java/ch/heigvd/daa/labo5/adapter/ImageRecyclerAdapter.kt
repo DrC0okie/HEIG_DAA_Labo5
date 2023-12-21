@@ -1,6 +1,8 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.adapter
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,6 +11,11 @@ import android.widget.ProgressBar
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import androidx.lifecycle.LifecycleCoroutineScope
+import ch.heigvd.daa.labo5.R
+import ch.heigvd.daa.labo5.cache.Cache
+import ch.heigvd.daa.labo5.utils.ImageDownloader.decode
+import ch.heigvd.daa.labo5.utils.ImageDownloader.download
+import ch.heigvd.daa.labo5.utils.Network.isNetworkAvailable
 import java.net.URL
 
 /**
@@ -18,6 +25,7 @@ import java.net.URL
  * @param scope LifecycleCoroutineScope for managing coroutine lifecycle.
  */
 class ImageRecyclerAdapter(
+    private val context: Context,
     urls: List<URL> = listOf(),
     private val scope: LifecycleCoroutineScope,
     private val itemClickListener: OnItemClickListener
@@ -105,9 +113,17 @@ class ImageRecyclerAdapter(
          *
          * @param bitmap The downloaded bitmap to display.
          */
-        private suspend fun updateImageView(bitmap: Bitmap) = withContext(Dispatchers.Main) {
-            with(image) { setImageBitmap(bitmap); visibility = View.VISIBLE }
-            progressBar.visibility = View.GONE
+        private suspend fun updateImageView(bitmap: Bitmap?) = withContext(Dispatchers.Main) {
+            if (bitmap != null) {
+                image.setImageBitmap(bitmap)
+                image.visibility = View.VISIBLE
+                progressBar.visibility = View.GONE
+            } else {
+                // Handle the case where the bitmap is null (display a placeholder)
+                image.setImageResource(R.drawable.ic_launcher_foreground)
+                image.visibility = View.VISIBLE
+                progressBar.visibility = View.GONE
+            }
         }
 
         /**
@@ -117,13 +133,26 @@ class ImageRecyclerAdapter(
          * @param url The URL of the image to be downloaded.
          * @return Bitmap The bitmap either from cache or downloaded.
          */
-        private suspend fun getBitmap(filename: String, url: URL): Bitmap {
+        private suspend fun getBitmap(filename: String, url: URL): Bitmap? {
             var cachedBitmap = Cache.get(filename)
-            if (cachedBitmap == null) {
-                val downloader = ImageDownloader()
-                val bytes = downloader.downloadImage(url)
-                cachedBitmap = downloader.decodeImage(bytes!!)
-                Cache.set(filename, cachedBitmap!!)
+            if (cachedBitmap != null) {
+                return cachedBitmap
+            }
+
+            if (!isNetworkAvailable(context)) {
+                // Log a message or handle no network scenario
+                Log.e("ImageRecyclerAdapter", "No network available to download image")
+                return null
+            }
+
+            try {
+                val bytes = download(url)
+                if (bytes != null) {
+                    cachedBitmap = decode(bytes)
+                    Cache.set(filename, cachedBitmap!!)
+                }
+            } catch (e: Exception) {
+                Log.e("ImageRecyclerAdapter", "Error downloading image from $url", e)
             }
             return cachedBitmap
         }
@@ -142,5 +171,10 @@ class ImageRecyclerAdapter(
 
     override fun onViewRecycled(holder: ViewHolder) {
         holder.unbind()
+    }
+
+    fun updateItems(newItems: List<URL>) {
+        items = newItems
+        notifyDataSetChanged()
     }
 }

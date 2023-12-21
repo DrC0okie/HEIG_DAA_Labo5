@@ -1,10 +1,110 @@
 # HEIG_DAA_Labo5
 
+**Auteurs: ** Timothée Van Hove, Léo Zmoos
+
+**Date: ** 21.12.2023
+
 ## Introduction
+
+Ce laboratoire consiste à concevoir une application Android, se présentant sous la forme d'une galerie d'images dynamique. À travers la mise en pratique des concepts de programmation asynchrone et de la gestion des ressources locales, ce projet vise à illustrer l'application des Coroutines Kotlin et du WorkManager pour des opérations de téléchargement et de mise en cache des images récupérées depuis le réseau. La gestion du réseau et l'efficience des opérations en arrière-plan sont au cœur des enjeux abordés, mettant en lumière l'importance d'une architecture d'application bien conçue.
+
+
+
+![](C:\Users\timot\Documents\HEIG\DAA\HEIG_DAA_Labo5\figures\Introduction.png)
 
 
 
 ## Choix d'implémentation
+
+
+
+### Gestion de la connectivité
+
+La connectivité à Internet est essentielle pour le fonctionnement de notre application. Nous avons donc mis en place une méthode dédiée pour vérifier la disponibilité du réseau :
+
+```kotlin
+object Network {
+    fun isNetworkAvailable(context: Context): Boolean {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val capabilities = manager.activeNetwork ?: return false
+        val actNw = manager.getNetworkCapabilities(capabilities) ?: return false
+
+        return when {
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+            else -> false
+        }
+    }
+}
+```
+
+Cette méthode nous permet de gérer les cas où une connexion Internet est absente ou perdue, en particulier lors du démarrage initial de l'application et lors des tentatives de rafraîchissement de la `RecyclerView`. Pour informer l'utilisateur de l'absence de connectivité, un dialogue d'erreur est affiché :
+
+```kotlin
+object Dialogs {
+    fun showNoConnectionDialog(context: Context, inflater: LayoutInflater) {
+        val dialogView = inflater.inflate(R.layout.dialog_no_connection, null)
+        val dialog = AlertDialog.Builder(context)
+            .setView(dialogView).setNegativeButton("Ok") { dialog, _ -> dialog.dismiss()}.create()
+
+        dialog.show()
+    }
+}
+```
+
+Ce dialogue est déclenché dans la `MainActivity` via la méthode `tryLoadImages`, qui tente de charger les images si une connexion est disponible ou affiche le dialogue d'erreur dans le cas contraire :
+
+```kotlin
+class MainActivity : AppCompatActivity(), OnItemClickListener {
+	// ( ... )
+    private fun tryLoadImages(): Boolean {
+        return if (isNetworkAvailable(this)) {
+            adapter.updateItems(items)
+            true
+        } else {
+            showNoConnectionDialog(this, layoutInflater)
+            false
+        }
+    }
+    // ( ... )
+}
+```
+
+
+
+### Swipe to refresh
+
+Nous avons intégré la fonctionnalité "Swipe to refresh" dans notre application pour permettre une actualisation facile des données affichées. Pour implémenter cette feature, nous avons enveloppé notre `RecyclerView` dans un `SwipeRefreshLayout`. Ce conteneur permet à l'utilisateur de rafraîchir le contenu en effectuant un geste de glissement vers le bas. Voici comment nous avons structuré notre mise en page XML pour intégrer le `SwipeRefreshLayout` :
+
+```xml
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+	android:id="@+id/swipe_refresh_layout"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent">
+
+<androidx.recyclerview.widget.RecyclerView
+	android:id="@+id/recycler_view"
+	android:layout_width="match_parent"
+	android:layout_height="0dp"
+	app:layout_constraintBottom_toBottomOf="parent"
+	app:layout_constraintEnd_toEndOf="parent"
+	app:layout_constraintStart_toStartOf="parent"
+	app:layout_constraintTop_toTopOf="parent" />
+
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+```
+
+
+
+Dans l'activité hôte, nous avons configuré le `SwipeRefreshLayout` en implémentant `setOnRefreshListener`. Dans ce cas, nous déclenchons le processus de nettoyage manuel du cache et le rechargement des images:
+
+```kotlin
+binding.swipeRefreshLayout.setOnRefreshListener {
+	manualClearCache()
+	binding.swipeRefreshLayout.isRefreshing = false
+}
+```
 
 
 
@@ -14,9 +114,9 @@ Nous avons profité de la rallonge du délai de rendu de ce laboratoire pour all
 
 #### Activité hôte (`TestActivity`)
 
-Cette activité permet de lancer les tests de performance en cliquant sur le 2e bouton du menu. La méthode `launchTests` va alors lancer les tests dans une coroutine, car nous avons besoin d'afficher la progressBar dans l'activité, donc ces test ne doivent pas être bloquants.
+Cette activité permet de lancer les tests de performance en cliquant sur le 2e bouton du menu. L'exécution des tests se fait de manière asynchrone pour ne pas bloquer l'interface utilisateur, tout en fournissant des retours en temps réel via une barre de progression et des messages d'état.
 
-````kotlin
+```kotlin
 private fun launchTests() {
 	//( ... )
 
@@ -36,15 +136,15 @@ private fun launchTests() {
 			updateProgress = { progress -> progressBar.progress = progress }
 		)
 		//( ... )
-	}      
+	}
 }
-````
+```
 
 
 
 Une fois que nous avons récupéré les résultats des tests, nous les affichons dans le graphique grâce à la méthode `setupBarChart `:
 
-````kotlin
+```kotlin
 private fun setupBarChart(testResults: List<TestResult>) {
 	val entries = ArrayList<BarEntry>() // List to hold bar entries
 	val labels = ArrayList<String>() // List to hold axis labels
@@ -58,15 +158,15 @@ private fun setupBarChart(testResults: List<TestResult>) {
 
 	barChart.invalidate() // Display the chart
 }
-````
+```
 
 
 
 #### Implémentation des tests (`PerformanceTester`)
 
-Nous avons repris la même logique de téléchargement que dans l'`ImageRecyclerAdapter`, à savoir utilise la classe `ImageDownloader` qui télécharge et décode chaque image récupérée du serveur.
+Cette classe utilise la logique de téléchargement d'images déjà établie dans notre application, mais l'applique à différents `CoroutineDispatchers` pour comparer leur efficacité.
 
-````kotlin
+```kotlin
 private suspend fun downloadImage(url: URL): Bitmap? {
 	return try {
 		with(ImageDownloader()){decodeImage(downloadImage(url)!!)}
@@ -75,31 +175,31 @@ private suspend fun downloadImage(url: URL): Bitmap? {
 		null
 	}
 }
-````
+```
 
 
 
 ##### Création des `Dispatchers`
 
-Pour pouvoir tester différents `Dispatchers`, nous avons créé une liste contenant le des paires de dispatchers. chaque paire consiste en un nom et son `CoroutineDispatcher` correspondant. Il s'agit notamment de "IO" et  plusieurs custom dispatchers avec un nombre fixe de threads (2, 4, 8, 16) créés à l'aide de `Executors.newFixedThreadPool`.
+Nous avons défini une liste de `CoroutineDispatcher` comprenant le dispatcher par défaut "IO" et plusieurs dispatchers personnalisés avec un nombre fixe de threads. Cette diversité permet d'évaluer l'impact du nombre de threads sur les performances de téléchargement.
 
 ```kotlin
 val dispatcherPairs = listOf(
-        "IO" to Dispatchers.IO,
-        "2 Threads" to Executors.newFixedThreadPool(2).asCoroutineDispatcher(),
-        "4 Threads" to Executors.newFixedThreadPool(4).asCoroutineDispatcher(),
-        "8 Threads" to Executors.newFixedThreadPool(8).asCoroutineDispatcher(),
-        "16 Threads" to Executors.newFixedThreadPool(16).asCoroutineDispatcher()
-    )
+	"IO" to Dispatchers.IO,
+	"2 Threads" to Executors.newFixedThreadPool(2).asCoroutineDispatcher(),
+	"8 Threads" to Executors.newFixedThreadPool(8).asCoroutineDispatcher(),
+	"16 Threads" to Executors.newFixedThreadPool(16).asCoroutineDispatcher(),
+	"32 Threads" to Executors.newFixedThreadPool(32).asCoroutineDispatcher()
+)
 ```
 
 
 
 ##### Test des performances
 
-La méthode`testDispatcherPerformance` orchestre le processus de test. Elle accepte une liste d'URL, des `CoroutineScopes` de test et d'interface utilisateur, ainsi que deux fonctions lambda pour les mises à jour de l'interface utilisateur. La fonction itère sur chaque dispatcher, exécute les tâches de téléchargement simultanément pour des URL données et enregistre le temps d'execution.
+La méthode`testDispatcherPerformance` prend en charge l'itération sur chaque dispatcher, exécutant les tâches de téléchargement simultanément pour un ensemble donné d'URLs et mesurant le temps nécessaire pour achever ces tâches. Les résultats sont ensuite retournés sous forme de liste, prêts à être affichés dans le graphique.
 
-````kotlin
+```kotlin
 import kotlinx.coroutines.CoroutineDispatcher as CD
 import kotlinx.coroutines.CoroutineScope as CS
 
@@ -108,17 +208,14 @@ suspend fun testDispatcherPerformance(
 	): List<TestResult> {
     val results = mutableListOf<TestResult>()
 
-    testScope.async {
-        dispatcherPairs.forEachIndexed { index, (name, dispatcher) ->
-            uiScope.launch { updateUI("Testing $name dispatcher...") }.join()
-            val duration = getDuration(items, dispatcher, testScope)
-            results.add(TestResult(name, duration))
-            uiScope.launch { updateUI("Testing complete!") }.join()
-            uiScope.launch { updateProgress(index + 1) }.join()
-        }
-    }.await()
-
-    return results
+	testScope.async {
+            dispatcherPairs.forEachIndexed { index, (name, dispatcher) ->
+                uiScope.launch { updateUI("Testing $name dispatcher...") }.join()
+                results.add(TestResult(name, getDuration(items, dispatcher, testScope)))
+                uiScope.launch { updateUI("Testing complete!"); updateProgress(index + 1) }.join()
+            }
+        }.await()
+        return results
 }
 
 private suspend fun getDuration(items: List<URL>, disp: CD, scope: CS): Long {
@@ -126,7 +223,7 @@ private suspend fun getDuration(items: List<URL>, disp: CD, scope: CS): Long {
     scope.launch(disp) { items.map { url -> launch { downloadImage(url) } }.joinAll() }.join()
     return System.currentTimeMillis() - startTime
 }
-````
+```
 
 
 
@@ -138,7 +235,7 @@ private suspend fun getDuration(items: List<URL>, disp: CD, scope: CS): Long {
 
 Chaque élément de la RecyclerView est géré par une classe ViewHolder, qui est responsable du lancement et de la gestion de la coroutine pour le téléchargement et l'affichage de l'image associée à cet élément. Voici comment la gestion des coroutines est implémentée :
 
-Dans la classe ViewHolder, une coroutine est démarrée dans la méthode `bind(url: URL)`. Cette coroutine gère le téléchargement et l'affichage de l'image. La coroutine est lancée dans un `LifecycleCoroutineScope` pour garantir qu'elle est liée au cycle de vie de l'activité qui l'héberge.
+Dans la classe ViewHolder, une coroutine est démarrée dans la méthode `bind(url: URL)`. Cette coroutine gère le téléchargement et l'affichage de l'image. La coroutine est lancée dans un `LifecycleCoroutineScope` . Ce `CoroutineScope` est utilisé pour lier les coroutines au cycle de vie de l'activité ou du fragment hôte, ce qui garantit que les coroutines sont annulées lorsque le cycle de vie est détruit. Cela ajoute une couche supplémentaire de gestion des coroutines en lien avec le cycle de vie des composants Android.
 
 Pour garantir que chaque élément a une coroutine distincte, une variable `currentUrl` est utilisée. Lorsqu'une nouvelle URL est liée à un `ViewHolder`, il vérifie si cette URL est différente de l'actuelle. Si elle est différente, cela indique que l'élément est sur le point d'afficher une nouvelle image, nécessitant l'annulation de toute coroutine en cours associée à l'image précédente:
 
@@ -168,7 +265,7 @@ Pour garantir que chaque élément a une coroutine distincte, une variable `curr
 
 
 
-Le système RecyclerView recycle les vues lorsqu'elles défilent hors de la zone visible. Pour gérer cela, la méthode `onViewRecycled(holder: ViewHolder)` de l'adaptateur est surchargée. Dans cette méthode, la méthode `unbind()` du `ViewHolder` est appelée. Cette méthode est chargée d'annuler toute coroutine active associée au ViewHolder. L'annulation est obtenue en appelant `downloadJob?.cancel()`, qui annule en toute sécurité la coroutine si elle est actuellement active. Cela garantit que tout téléchargement ou traitement d’image en cours est arrêté, libérant ainsi des ressources.
+Le `RecyclerView` recycle les vues lorsqu'elles défilent hors de la zone visible. Pour gérer ça, la méthode `onViewRecycled` de l'adaptateur est surchargée. Cette méthode est appelée automatiquement lorsqu'un élément sort de la zone visible et est prêt à être réutilisé, indiquant que la vue est sur le point d'être recyclée pour un autre élément de la liste. Dans cette méthode, la méthode `unbind()` du `ViewHolder` est appelée. Cette méthode est chargée d'annuler toute coroutine active associée au ViewHolder. L'annulation est obtenue en appelant `downloadJob?.cancel()`, qui annule en toute sécurité la coroutine si elle est actuellement active. Cela garantit que tout téléchargement ou traitement d’image en cours est arrêté, libérant ainsi des ressources.
 
 Finalement, dans la méthode `unbind()`, la visibilité de ProgressBar et d'ImageView est réinitialisée. Cela prépare le ViewHolder à la réutilisation avec un nouvel élément, garantissant ainsi un état cohérent. 
 
@@ -194,7 +291,7 @@ Finalement, dans la méthode `unbind()`, la visibilité de ProgressBar et d'Imag
 
 
 
-Grâce à cette implémentation, nous garantissons que toute coroutine associée à un élément RecyclerView est gérée correctement. Lorsqu'un élément est recyclé, sa coroutine associée est annulée, empêchant toute opération en arrière-plan qui n'est plus nécessaire.
+Grâce à cette implémentation, nous garantissons que toute coroutine associée à un élément de la RecyclerView est gérée correctement. Lorsqu'un élément est recyclé, sa coroutine associée est annulée, empêchant toute opération en arrière-plan qui n'est plus nécessaire.
 
 
 
@@ -202,11 +299,13 @@ Grâce à cette implémentation, nous garantissons que toute coroutine associée
 
 > *Comment pouvons-nous nous assurer que toutes les Coroutines soient correctement stoppées lorsque l’utilisateur quitte l’Activité ? Veuillez expliquer la solution que vous avez mise en œuvre, est-ce la plus adaptée ?*
 
-Pour aligner notre gestion des coroutines sur le cycle de vie de l'activité, nous avons utilisé le `lifecycleScope`,  un `CoroutineScope` prédéfini lié au cycle de vie de l'activité. Cette portée garantit que toutes les coroutines lancées au sein de celle-ci sont automatiquement annulées lorsque l'activité atteint la phase `onDestroy()` de son cycle de vie.
+Pour gérer efficacement les coroutines, nous avons utilisé le `lifecycleScope`, un `CoroutineScope` intégré lié au cycle de vie de l'activité. Ce scope assure que les coroutines lancées en son sein soient automatiquement annulées lorsque l'activité atteint sa phase de destruction (`onDestroy()`).
 
-Bien que `lifecycleScope` annule automatiquement les coroutines sur `onDestroy()`, nous avons encore renforcé ce comportement pour gérer explicitement l'annulation des coroutines. Nous l'avons fait en surchargeant la méthode `onDestroy()` dans notre MainActivity:
+Dans notre `MainActivity`, nous utilisons `lifecycleScope` pour lancer des coroutines liées aux opérations d'interface utilisateur. `lifecycleScope` s'aligne sur le cycle de vie de l'activité, garantissant ainsi que les coroutines ne continuent pas à s'exécuter si l'activité est détruite, évitant les opérations redondantes.
 
-````Kotlin
+Bien que `lifecycleScope` gère automatiquement l'annulation des coroutines, nous avons renforcé ce comportement dans la méthode `onDestroy()` de notre activité :
+
+```Kotlin
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
@@ -214,11 +313,11 @@ Bien que `lifecycleScope` annule automatiquement les coroutines sur `onDestroy()
             lifecycleScope.coroutineContext.cancelChildren()
         }
     }
-````
+```
 
 
 
-Dans cette implémentation, nous invoquons `CancelChildren()` sur le `CoroutineContext` de `lifecycleScope`. Cette méthode annule toutes les coroutines démarrées dans le lifecycleScope. La vérification `if (isFinishing)` garantit que les coroutines ne sont annulées que lorsque l'activité est réellement terminée et pas seulement en cours de changement de configuration (comme la rotation de l'écran). Cette distinction est importante pour éviter l'annulation prématurée des coroutines, qui pourrait encore être nécessaire si l'activité est simplement recréée.
+Dans ce code, nous appelons `cancelChildren()` sur le contexte de coroutines de `lifecycleScope`. Cette méthode annule toutes les coroutines en cours dans ce scope. L'utilisation de `isFinishing` permet de distinguer entre une destruction temporaire (comme une rotation d'écran) et une fermeture définitive de l'activité.
 
 **Est-ce que cette solution est la plus adaptée?** N'étant pas experts Android, il est difficile de répondre à cette question, cependant nous pouvons apporter quelques éléments de réponse:
 
@@ -234,29 +333,18 @@ Dans cette implémentation, nous invoquons `CancelChildren()` sur le `CoroutineC
 
 Comme mentionné dans la partie [Implémentation de tests de performance](#Extra: Implémentation de tests de performance), nous avons mis en place une activité permettant de faire des tests de performance concernant plusieurs dispatchers. Voici les résultats de nos tests:
 
-Avec 16 images téléchargées en parallèle, nous voyons clairement que le dispatcher IO est le plus lent
-
-![](figures/tests/16_images.png)
 
 
-
-Avec 32 images téléchargées en parallèle, le dispatcher custom de 16 threads est le plus rapide
-
-![](figures/tests/32_images.png)
+![](C:\Users\timot\Documents\HEIG\DAA\HEIG_DAA_Labo5\figures\tests\4_tests.png)
 
 
 
-Avec 64 images téléchargées en parallèle, le dispatcher custom de 16 threads est encore le plus rapide
+* Avec 16 images téléchargées en parallèle, nous voyons clairement que le dispatcher IO est le plus lent
+* Avec 32 images téléchargées en parallèle, le dispatcher custom de 32 threads est le plus rapide
+* Avec 64 images téléchargées en parallèle, le dispatcher custom de 16 threads est le plus rapide
+* Avec 128 images téléchargées en parallèle le dispatchers custom de 16 threads est le plus rapide
 
-![](figures/tests/64_images.png)
-
-
-
-Avec 128 images téléchargées en parallèle les dispatchers custom de 4, 8 et 16 threads sont les plus rapides
-
-![](figures/tests/128_images.png)
-
-Nous pouvons en tirer la conclusion que, bien qu'il soit le dispatcher recommandé pour ce genre de tâche, l’utilisation du Dispatchers.IO n'est pas forcément la plus adaptée. Dans notre cas un dispatcher avec un thread pool de 16 est systématiquement plus rapide.
+`Dispatchers.IO` est optimisé pour les opérations d'entrée/sortie qui bloquent les threads, comme la lecture et l'écriture de fichiers ou les opérations de réseau. Il utilise un pool de threads partagé qui est dimensionné automatiquement en fonction des besoins de l'application. Cependant, si une tâche de téléchargement implique des opérations CPU-intensives, comme le **décodage d'images**, l'utilisation d'un `Dispatcher` personnalisé avec un pool de threads dédié peut offrir de meilleures performances, car cela permet de mieux contrôler la concurrence et la parallélisation des tâches. Dans notre cas n'importe lequel des dispatchers custom avec un thread pool de 2, 8, 16 ou 32 threads est systématiquement plus rapide.
 
 
 
@@ -272,15 +360,15 @@ Nous avons déjà implémenté ce genre de feature dans le labo précédent (cli
 
 Nous allons créer une interface qui nous permettra de propager le clickListener vers la MainActivity:
 
-````kotlin
+```kotlin
 interface OnItemClickListener {
     fun onItemClick(position: Int, items: List<URL>)
 }
-````
+```
 
 Ensuite dans notre MainActivity, nous allons implémenter le clickListener de notre interface. Dans ce click listener, nous allons récupérer l'url de l'image et lancer une nouvelle activité. Le fait de récupérer l'url, nous permettrait (en fonction de l'API) d'afficher une version haute résolution de l'image.
 
-````
+```kotlin
 class MainActivity : AppCompatActivity(), OnItemClickListener{
 // ( ... )
     override fun onItemClick(position: Int, items: List<URL>) {
@@ -291,13 +379,13 @@ class MainActivity : AppCompatActivity(), OnItemClickListener{
     }
 // ( ... )
 }
-````
+```
 
 
 
 Maintenant, créons notre activité d'affichage de l'image, avec son layout. Dans cette activité nous avons utilisé [glide](https://github.com/bumptech/glide), une librairie qui nous permet de charger et afficher des images depuis différentes sources. `glide` prends en charge le caching, la gestion de la mémoire et le décodage de l'image.
 
-````kotlin
+```kotlin
 class FullScreenImageActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -310,11 +398,11 @@ class FullScreenImageActivity : AppCompatActivity() {
         Glide.with(this).load(imageUrl).into(findViewById(R.id.fullScreenImageView))
     }
 }
-````
+```
 
 
 
-````xml
+```xml
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -325,13 +413,13 @@ class FullScreenImageActivity : AppCompatActivity() {
         android:layout_height="match_parent"
         android:scaleType="centerCrop"/>
 </FrameLayout>
-````
+```
 
 
 
-finalement, dans notre adapter, nous allons implémenter le ClickListener des éléments de la RecyclerView pour récupérer la position de l'élément sur lequel nous avons cliqué:
+finalement, dans notre adapter, nous allons implémenter le `ClickListener` des éléments de la RecyclerView pour récupérer la position de l'élément sur lequel nous avons cliqué:
 
-````kotlin
+```kotlin
 class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: LifecycleCoroutineScope, private val itemClickListener: OnItemClickListener) :
     RecyclerView.Adapter<ImageRecyclerAdapter.ViewHolder>() {
 	// ( ... )
@@ -347,14 +435,15 @@ class ImageRecyclerAdapter(urls: List<URL> = listOf(), private val scope: Lifecy
         }
 	//( ... )
 }
-````
+```
 
 
 
 ### Ajouter un feedback
 
 Nous avons d'abord essayé d'utiliser un ripple effect, mais cette méthode n'a pas fonctionné. Nous avons alors opté pour une animation que nous avons implémenté sur le ClickListener de chaque item de la RecyclerView dans le block `init` du `ViewHolder`:
-````Kotlin
+
+```Kotlin
 init {
 	view.setOnClickListener {
 	// Scale animation for visual feedback
@@ -364,7 +453,7 @@ init {
 		// ( ... )
 	}
 }
-````
+```
 
 
 
@@ -372,15 +461,37 @@ init {
 
 > *Lors du lancement de la tâche ponctuelle, comment pouvons-nous faire en sorte que la galerie soit rafraîchie ?*
 
-Il suffit d'appeler `adapter.notifyDataSetChanged()` pour rafraichir la galerie:
-````kotlin
-    private fun manualClearCache() {
-        val clearCacheWork = OneTimeWorkRequestBuilder<ClearCacheWorker>().build()
-        WorkManager.getInstance(this).enqueue(clearCacheWork)
-        adapter.notifyDataSetChanged() // Refresh the gallery
-        Toast.makeText(this, "Cache cleared", Toast.LENGTH_LONG).show()
-    }
-````
+Il suffit d'appeler `adapter.notifyDataSetChanged()` pour rafraichir la galerie. Pour faire cela, la méthode `manualClearCache` appelle la méthode `tryLoadImages`, qu elle même va déclencher le rafraîchissement en appelant `updateItems` qui est dans l'adapter
+
+```kotlin
+private fun manualClearCache() {
+	val clearCacheWork = OneTimeWorkRequestBuilder<ClearCacheWorker>().build()
+	WorkManager.getInstance(this).enqueue(clearCacheWork)
+
+	// After clearing the cache, reload the images
+	if (tryLoadImages())
+		Toast.makeText(this, "Cache cleared and images reloaded", Toast.LENGTH_LONG).show()
+}
+
+private fun tryLoadImages(): Boolean {
+	return if(isNetworkAvailable(this)){
+		adapter.updateItems(items)
+		true
+	} else{
+		showNoConnectionDialog(this, layoutInflater)
+		false
+	}
+}
+```
+
+Dans l'adapter:
+
+```kotlin
+fun updateItems(newItems: List<URL>) {
+	items = newItems
+	notifyDataSetChanged()
+}
+```
 
 
 
@@ -390,27 +501,22 @@ Il suffit d'appeler `adapter.notifyDataSetChanged()` pour rafraichir la galerie:
 
 
 
-### Explications concernant le fonctionnement du `WorkManager`
+`WorkManager` est conçu pour garantir que les tâches asynchrones soient gérées de manière robuste, même à travers les redémarrages de l'appareil ou les arrêts de l'application. Pour les tâches périodiques, il est crucial d'assurer qu'une tâche spécifique ne soit pas enregistrée plusieurs fois afin d'éviter des exécutions redondantes ou inattendues. Pour prévenir l'enregistrement multiple de la même tâche périodique, `WorkManager` fournit la méthode `enqueueUniquePeriodicWork`. Cette méthode prend un nom unique pour la work request, ce qui permet de s'assurer qu'il n'y a qu'une seule instance de cette tâche qui soit programmée à un moment donné.
 
-WorkManager gère les tâches asynchrones différées qui nécessitent une exécution fiable. Elle est particulièrement utile pour les tâches qui doivent continuer à s'exécuter même si l'application se termine ou si l'appareil redémarre.
+Avec `enqueueUniquePeriodicWork`, nous utilisons également une `ExistingPeriodicWorkPolicy` qui définit la conduite à tenir si une tâche avec le même nom unique est déjà enregistrée :
 
-Il planifie des tâches périodiques à l'aide du `PeriodicWorkRequest` qui se répètent à des intervalles définies. Lorsque nous planifions une tâche périodique, le `WorkManager` s'assure que cette tâche s'exécute de manière répétée à l'intervalle spécifié. Chaque exécution du travail est traitée comme une tâche distincte. Il offre également une grande flexibilité dans l'exécution des tâches. Par exemple, si un appareil redémarre ou si l'application est tuée, il s'assure que le travail périodique est reprogrammé en fonction des contraintes et des intervalles définis.
+- `KEEP` : Si une tâche avec le même nom existe déjà, la nouvelle tâche ne sera pas enregistrée. Cela garantit que la tâche originale continue de s'exécuter selon son intervalle défini sans interruption.
+- `REPLACE` : La tâche existante sera remplacée par la nouvelle tâche. Cette option peut être utilisée pour mettre à jour ou redéfinir une tâche avec des paramètres ou des contraintes mis à jour.
 
-#### Persistance et redémarrage du téléphone
+#### Persistance et redémarrage
 
-Le `WorkManager` utilise une base de données (SQLite) pour persister les work request. Quand nous mettons en queue une work request, il la stocke dans sa base de données. Grâce à son mécanisme de persistance, Il peut rescheduler et poursuivre le travail en attente même après le redémarrage du téléphone. Il écoute les émissions système de démarrage BOOT_COMPLETED pour savoir quand l'appareil est redémarré. Au redémarrage de l'appareil, Le `WorkManager` vérifie dans sa base de données les travaux non terminés ou en attente. Il reschedule ensuite ce travail en fonction des work request enregistrées et de leurs contraintes.
+`WorkManager` utilise une base de données interne pour suivre les tâches. Lorsqu'un travail est planifié, il est persisté dans cette base de données. En cas de redémarrage de l'appareil, `WorkManager` écoute l'intention `BOOT_COMPLETED` et reprogramme automatiquement les travaux enregistrés en se basant sur les informations stockées.
 
-### S'assurer que la tâche ne soit pas ré-enregistrée
+#### Implémentation dans l'application
 
-Pour éviter qu'une tâche périodique ne soit enregistrée plusieurs fois dans WorkManager il est possible d'identifier les work request de manière unique. WorkManager nous permet d'attribuer un nom unique à nos work request et de déterminer ce qu'il faut faire s'il existe une work request portant le même nom en utilisant la méthode `enqueueUniquePeriodicWork`.
+Dans notre application, nous utilisons la méthode `enqueueUniquePeriodicWork` avec la politique `ExistingPeriodicWorkPolicy.KEEP` pour planifier la tâche de nettoyage du cache :
 
-Cette méthode permet de spécifier un nom unique pour notre work request et de définir une `ExistingPeriodicWorkPolicy`. La méthode `ExistingPeriodicWorkPolicy` détermine ce qui se passe s'il existe déjà un travail périodique portant le même nom unique :
-
-* REPLACE: s'il existe une work request en attente portant le même nom unique, elle sera annulée et la nouvelle work request remplacera l'ancienne.
-* KEEP : La nouvelle work request ne sera pas mise en file d'attente.
-
-Dans notre implémentation:
-````kotlin
+```kotlin
 class MainActivity : AppCompatActivity(), OnItemClickListener {
 
     companion object {
@@ -420,16 +526,34 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         val UNIT = TimeUnit.MINUTES
     }
     
+    override fun onCreate(savedInstanceState: Bundle?) {
+		// ( ... )
+        setPeriodicCacheClear()
+		// ( ... )
+    }
+    
     // ( ... )
     
-    // Bind the periodic cache clear
-	val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
-	val wm = WorkManager.getInstance(this)
-	wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
+	private fun setPeriodicCacheClear() {
+        // Bind the periodic cache clear
+        val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
+        val wm = WorkManager.getInstance(this)
+        wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
+    }
 	
 	// ( ... )
 }
-````
+```
 
+Avec cette mise en œuvre, nous garantissons que notre tâche de nettoyage du cache ne sera programmée qu'une seule fois. Si l'application tente de planifier à nouveau la tâche avec le même `uniqueWorkName`, la politique `KEEP` s'assurera que la première instance de la tâche continue de fonctionner comme prévu sans duplication.
 
+## Conclusion
+
+Ce laboratoire nous a permis de nous plonger dans les méandres de la programmation asynchrone et de la gestion des ressources réseau sur Android. L'opportunité de dépasser les exigences de base en développant une fonctionnalité de tests de performance a non seulement été fun mais a également renforcé notre compréhension pratique des dispatchers et de la concurrence en Kotlin.
+
+La gestion de la connectivité réseau nous a obligé à réfléchir à la robustesse de l'application concernant les changements d'état de réseau. C'est pertinent car les utilisateurs s'attendent à une fiabilité continue, même dans des conditions réseau fluctuantes.
+
+L'utilisation de `WorkManager` pour des tâches périodiques nous a permis d'apprendre l'implémentation de la planification d'une tâche persistante utilisée pour le nettoyage du cache. Cette compréhension sera très utile pour la conception d'applications à l'avenir.
+
+Finalement, ce projet a été une opportunité d'appliquer les bonnes pratiques en matière de développement Android, de réfléchir à l'expérience utilisateur lors de l'ajout de nouvelles fonctionnalités et d'utiliser une bonne approche pour l'optimisation des performances. Les compétences et les connaissances acquises au cours de ce laboratoire nous sera très utile pour nos futurs projets de développement mobile.
 

@@ -1,6 +1,5 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.activities
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
@@ -10,7 +9,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.work.*
+import ch.heigvd.daa.labo5.cache.Cache
+import ch.heigvd.daa.labo5.cache.ClearCacheWorker
+import ch.heigvd.daa.labo5.adapter.ImageRecyclerAdapter
+import ch.heigvd.daa.labo5.adapter.OnItemClickListener
+import ch.heigvd.daa.labo5.R
 import ch.heigvd.daa.labo5.databinding.ActivityMainBinding
+import ch.heigvd.daa.labo5.utils.Dialogs.showNoConnectionDialog
+import ch.heigvd.daa.labo5.utils.Network.isNetworkAvailable
 import kotlinx.coroutines.cancelChildren
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -22,9 +28,7 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
 
     companion object {
         const val INTERVAL = 15L
-        const val PICTURES_NB = 10000
-        const val ENDPOINT = "https://daa.iict.ch/images/"
-        const val FILE_EXT = ".jpg"
+        val items = List(10000) { URL("https://daa.iict.ch/images/${it + 1}.jpg") }
         const val uniqueWorkName = "ClearCachePeriodicWorkLabo5"
         val WM_POLICY = ExistingPeriodicWorkPolicy.KEEP
         val UNIT = TimeUnit.MINUTES
@@ -38,17 +42,10 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         // Init the cache object default path
         Cache.setDir(cacheDir)
 
-        // Generate list of URLs
-        val items = List(PICTURES_NB) { URL("$ENDPOINT${it + 1}$FILE_EXT") }
-
-        adapter = ImageRecyclerAdapter(items, lifecycleScope, this)
-        binding.recyclerView.adapter = adapter
-        binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
-
-        // Bind the periodic cache clear
-        val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
-        val wm = WorkManager.getInstance(this)
-        wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
+        initRecyclerView()
+        tryLoadImages()
+        setPeriodicCacheClear()
+        setupSwipeRefresh()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -59,9 +56,14 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.menu_actions_refresh -> {
-                manualClearCache()
+                if (adapter.itemCount > 0) {
+                    manualClearCache() // Clear cache and reload if items are already there
+                } else {
+                    tryLoadImages() // Just load images if the RecyclerView is empty
+                }
                 true
             }
+
             R.id.menu_actions_test -> {
                 this.startActivity(Intent(this, TestActivity::class.java))
                 true
@@ -86,11 +88,42 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         startActivity(intent)
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     private fun manualClearCache() {
         val clearCacheWork = OneTimeWorkRequestBuilder<ClearCacheWorker>().build()
         WorkManager.getInstance(this).enqueue(clearCacheWork)
-        adapter.notifyDataSetChanged() // Refresh the gallery
-        Toast.makeText(this, "Cache cleared", Toast.LENGTH_LONG).show()
+
+        // After clearing the cache, reload the images
+        if (tryLoadImages())
+            Toast.makeText(this, "Cache cleared and images reloaded", Toast.LENGTH_LONG).show()
+    }
+
+    private fun initRecyclerView() {
+        adapter = ImageRecyclerAdapter(this, emptyList(), lifecycleScope, this)
+        binding.recyclerView.adapter = adapter
+        binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
+    }
+
+    private fun tryLoadImages(): Boolean {
+        return if (isNetworkAvailable(this)) {
+            adapter.updateItems(items)
+            true
+        } else {
+            showNoConnectionDialog(this, layoutInflater)
+            false
+        }
+    }
+
+    private fun setPeriodicCacheClear() {
+        // Bind the periodic cache clear
+        val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
+        val wm = WorkManager.getInstance(this)
+        wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
+    }
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            manualClearCache()
+            binding.swipeRefreshLayout.isRefreshing = false
+        }
     }
 }

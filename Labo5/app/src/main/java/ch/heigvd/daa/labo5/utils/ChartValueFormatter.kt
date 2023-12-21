@@ -1,4 +1,4 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.utils
 
 import com.github.mikephil.charting.formatter.ValueFormatter
 

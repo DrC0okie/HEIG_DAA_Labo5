@@ -1,7 +1,9 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.utils
 
 import android.graphics.Bitmap
 import android.util.Log
+import ch.heigvd.daa.labo5.utils.ImageDownloader.decode
+import ch.heigvd.daa.labo5.utils.ImageDownloader.download
 import kotlinx.coroutines.CoroutineDispatcher as CD
 import kotlinx.coroutines.CoroutineScope as CS
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +51,7 @@ object PerformanceTester {
 
     private suspend fun downloadImage(url: URL): Bitmap? {
         return try {
-            with(ImageDownloader()) { decodeImage(downloadImage(url)!!) }
+            decode(download(url)!!)
         } catch (e: Exception) {
             Log.e("ImageDownload", "Error downloading image from $url", e)
             null

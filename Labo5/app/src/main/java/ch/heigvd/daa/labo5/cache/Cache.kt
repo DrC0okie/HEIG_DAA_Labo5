@@ -1,4 +1,4 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.cache
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -34,6 +34,9 @@ object Cache {
     private fun isExpired(file: File) = file.lastModified() < System.currentTimeMillis() - EXP_DELAY
 
     private fun File.writeBitmap(bitmap: Bitmap, quality: Int = 100) {
+        // Check if the parent directory exists, create it if it doesn't
+        parentFile?.let {if (!it.exists()) it.mkdirs()}
+
         outputStream().use {
             bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it)
             it.flush()

@@ -1,7 +1,8 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.activities
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import ch.heigvd.daa.labo5.R
 import com.bumptech.glide.Glide
 
 class FullScreenImageActivity : AppCompatActivity() {

@@ -1,9 +1,9 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.cache
 
 import android.content.Context
-import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import ch.heigvd.daa.labo5.cache.Cache
 
 class ClearCacheWorker(appContext: Context, workerParams: WorkerParameters) :
     Worker(appContext, workerParams) {

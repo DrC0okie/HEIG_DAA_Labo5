@@ -1,9 +1,16 @@
-package ch.heigvd.daa.labo5
+package ch.heigvd.daa.labo5.activities
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import ch.heigvd.daa.labo5.utils.ChartValueFormatter
+import ch.heigvd.daa.labo5.R
+import ch.heigvd.daa.labo5.utils.TestResult
 import ch.heigvd.daa.labo5.databinding.ActivityTestBinding
+import ch.heigvd.daa.labo5.utils.Network.isNetworkAvailable
+import ch.heigvd.daa.labo5.utils.PerformanceTester
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
@@ -36,21 +43,24 @@ class TestActivity : AppCompatActivity() {
     }
 
     private fun launchTests() {
+        if (!isNetworkAvailable(this)){
+            Toast.makeText(this, "No internet connection available", Toast.LENGTH_LONG).show()
+            return
+        }
+
         with(binding) {
             val nbDownloads = editTextNbImages.text.toString().toInt()
 
             // Validate the number of downloads
-            if (nbDownloads < 0 || nbDownloads > MAX_DOWNLOAD) {
-                editTextNbImages.error = "The quantity of images must be > 0 and < $MAX_DOWNLOAD"
+            if(! isInputValid(nbDownloads))
                 return
-            }
 
             // Disable the test button to prevent multiple clicks during test execution
             buttonStartTest.isEnabled = false
             editTextNbImages.error = null
 
             // Prepare the list of URLs for the images to be downloaded
-            val items = List(nbDownloads) { URL("${ENDPOINT}${it + 1}${FILE_EXT}") }
+            val items = List(nbDownloads) { URL("$ENDPOINT${it + 1}$FILE_EXT") }
 
             // Initialize the progress bar
             progressBar.apply { max = PerformanceTester.dispatcherPairs.size; progress = 0 }
@@ -84,7 +94,7 @@ class TestActivity : AppCompatActivity() {
         // Create a dataset and Set the text size, the bars color and the formatter
         BarDataSet(entries, "Dispatcher Performance").apply {
             valueTextSize = 12f
-            color = resources.getColor(R.color.main_theme)
+            color = ContextCompat.getColor(this@TestActivity, R.color.main_theme)
             valueFormatter = ChartValueFormatter()
         }.also{binding.barChart.data = BarData(it)}
 
@@ -103,5 +113,13 @@ class TestActivity : AppCompatActivity() {
             barChart.description.text = ""
             barChart.invalidate() // refresh
         }
+    }
+
+    private fun isInputValid(nbDownloads: Int):Boolean{
+        if (nbDownloads < 0 || nbDownloads > MAX_DOWNLOAD) {
+            binding.editTextNbImages.error = "The image quantity must be > 0 and < $MAX_DOWNLOAD"
+            return false
+        }
+        return true
     }
 }
