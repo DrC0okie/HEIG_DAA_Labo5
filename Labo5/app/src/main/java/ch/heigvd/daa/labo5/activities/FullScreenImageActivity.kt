@@ -5,6 +5,10 @@ import androidx.appcompat.app.AppCompatActivity
 import ch.heigvd.daa.labo5.R
 import com.bumptech.glide.Glide
 
+/**
+ * Activity for displaying an image in full-screen mode.
+ * @author Timothée Van Hove, Léo Zmoos
+ */
 class FullScreenImageActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {

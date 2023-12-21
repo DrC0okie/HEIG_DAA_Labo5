@@ -20,9 +20,9 @@ import java.net.URL
 
 /**
  * Adapter for a RecyclerView to display images from URLs using coroutines.
- * @author Timothée Van Hove, Léo Zmoos
  * @param urls List of image URLs to be displayed in the RecyclerView.
  * @param scope LifecycleCoroutineScope for managing coroutine lifecycle.
+ * @author Timothée Van Hove, Léo Zmoos
  */
 class ImageRecyclerAdapter(
     private val context: Context,
@@ -67,7 +67,6 @@ class ImageRecyclerAdapter(
         /**
          * Binds a URL to this ViewHolder. If the URL is different from the current one,
          * it cancels any existing download and starts a new one.
-         *
          * @param url The URL of the image to be loaded and displayed.
          */
         fun bind(url: URL) {
@@ -110,7 +109,6 @@ class ImageRecyclerAdapter(
 
         /**
          * Updates the ImageView with the downloaded bitmap on the main thread.
-         *
          * @param bitmap The downloaded bitmap to display.
          */
         private suspend fun updateImageView(bitmap: Bitmap?) = withContext(Dispatchers.Main) {
@@ -128,7 +126,6 @@ class ImageRecyclerAdapter(
 
         /**
          * Retrieves the bitmap from cache or downloads it if not cached.
-         *
          * @param filename The filename used for caching the bitmap.
          * @param url The URL of the image to be downloaded.
          * @return Bitmap The bitmap either from cache or downloaded.

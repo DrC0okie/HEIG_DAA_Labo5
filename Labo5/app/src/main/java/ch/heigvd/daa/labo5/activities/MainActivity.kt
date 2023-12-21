@@ -21,6 +21,10 @@ import kotlinx.coroutines.cancelChildren
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
+/**
+ * The main activity for the image gallery application.
+ * @author Timothée Van Hove, Léo Zmoos
+ */
 class MainActivity : AppCompatActivity(), OnItemClickListener {
 
     private lateinit var binding: ActivityMainBinding
@@ -48,11 +52,17 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         setupSwipeRefresh()
     }
 
+    /**
+     * Initialize the contents of the Activity's standard options menu.
+     */
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu, menu)
         return super.onCreateOptionsMenu(menu)
     }
 
+    /**
+     * This hook is called whenever an item in your options menu is selected.
+     */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.menu_actions_refresh -> {
@@ -73,6 +83,9 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         }
     }
 
+    /**
+     * Perform any final cleanup before an activity is destroyed.
+     */
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
@@ -81,6 +94,11 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         }
     }
 
+    /**
+     * Callback method to be invoked when an item in this view has been clicked.
+     * @param position The position of the view in the adapter.
+     * @param items The list of URLs that the adapter is currently managing.
+     */
     override fun onItemClick(position: Int, items: List<URL>) {
         val imageUrl = items[position].toString()
         val intent = Intent(this, FullScreenImageActivity::class.java)
@@ -88,6 +106,9 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         startActivity(intent)
     }
 
+    /**
+     * Triggers a manual cache clear operation and attempts to reload images.
+     */
     private fun manualClearCache() {
         val clearCacheWork = OneTimeWorkRequestBuilder<ClearCacheWorker>().build()
         WorkManager.getInstance(this).enqueue(clearCacheWork)
@@ -97,12 +118,19 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
             Toast.makeText(this, "Cache cleared and images reloaded", Toast.LENGTH_LONG).show()
     }
 
+    /**
+     * Initializes the RecyclerView with an adapter and layout manager.
+     */
     private fun initRecyclerView() {
         adapter = ImageRecyclerAdapter(this, emptyList(), lifecycleScope, this)
         binding.recyclerView.adapter = adapter
         binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
     }
 
+    /**
+     * Attempts to load images if network is available. Displays a dialog if not.
+     * @return Boolean True if images are loaded, false otherwise.
+     */
     private fun tryLoadImages(): Boolean {
         return if (isNetworkAvailable(this)) {
             adapter.updateItems(items)
@@ -113,6 +141,9 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         }
     }
 
+    /**
+     * Sets up a periodic cache clearing task using WorkManager.
+     */
     private fun setPeriodicCacheClear() {
         // Bind the periodic cache clear
         val clearCacheRequest = PeriodicWorkRequestBuilder<ClearCacheWorker>(INTERVAL, UNIT).build()
@@ -120,6 +151,9 @@ class MainActivity : AppCompatActivity(), OnItemClickListener {
         wm.enqueueUniquePeriodicWork(uniqueWorkName, WM_POLICY, clearCacheRequest)
     }
 
+    /**
+     * Sets up the swipe-to-refresh layout's behavior.
+     */
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setOnRefreshListener {
             manualClearCache()

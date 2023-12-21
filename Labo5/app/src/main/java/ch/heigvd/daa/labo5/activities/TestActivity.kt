@@ -19,6 +19,12 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import kotlinx.coroutines.launch
 import java.net.URL
 
+/**
+ * Activity for testing the performance of different dispatchers.
+ *
+ * Allows the user to select the number of images to download and displays the performance in a bar chart.
+ * @author Timothée Van Hove, Léo Zmoos
+ */
 class TestActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTestBinding
@@ -42,6 +48,11 @@ class TestActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Initiates the performance testing process.
+     * It validates the user input, prepares the URLs for the images to be downloaded,
+     * and launches the tests within a coroutine.
+     */
     private fun launchTests() {
         if (!isNetworkAvailable(this)){
             Toast.makeText(this, "No internet connection available", Toast.LENGTH_LONG).show()
@@ -82,6 +93,10 @@ class TestActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Sets up the bar chart with test results.
+     * @param testResults List of test results containing the dispatcher name and the execution duration.
+     */
     private fun setupBarChart(testResults: List<TestResult>) {
         val entries = ArrayList<BarEntry>() // List to hold bar entries
         val labels = ArrayList<String>() // List to hold axis labels
@@ -115,6 +130,11 @@ class TestActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Validates if the number of downloads input by the user is within the allowed range.
+     * @param nbDownloads The number of images the user has requested to download.
+     * @return Boolean Returns true if the input is valid, false otherwise.
+     */
     private fun isInputValid(nbDownloads: Int):Boolean{
         if (nbDownloads < 0 || nbDownloads > MAX_DOWNLOAD) {
             binding.editTextNbImages.error = "The image quantity must be > 0 and < $MAX_DOWNLOAD"
